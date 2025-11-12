@@ -64,8 +64,8 @@
     // =========================
     // ① 환경변수 설정
     // =========================
-    const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co';
-    const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';
+    const SUPABASE_URL = 'https://fsqzjyyqewhqorgabodu.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzcXpqeXlxZXdocW9yZ2Fib2R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMzM0OTMsImV4cCI6MjA3NzgwOTQ5M30.hRdyF_uySB6ddpWeZ2Jc4kM35ETRxALsEnWDOjDHqPE';
 
     const sb = (typeof window.supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY)
       ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -355,7 +355,70 @@
           ])
         ])
       );
-      document.getElementById('ascii').textContent = p.ascii;
+      const preEl = document.getElementById('ascii');
+      preEl.textContent = p.ascii;
+
+      // === ASCII 자동 폰트 사이징 (가로/세로 동시 적합) ===
+      function fitAscii(){
+        // 상단 영역(헤더+타이틀 카드) 높이를 제외한 최대 높이 계산
+        const header = document.querySelector('header');
+        const headCard = document.getElementById('headWrap') ? document.getElementById('headWrap').closest('.card') : null;
+        const topHeights = (header ? header.offsetHeight : 0) + (headCard ? headCard.offsetHeight : 0) + 48; // 여유
+        const maxH = Math.max(200, Math.floor(window.innerHeight - topHeights));
+
+        // pre 영역 스타일/패딩/가용폭
+        const cs = getComputedStyle(preEl);
+        const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+        const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+        const contentW = Math.max(50, preEl.clientWidth - padX);
+
+        preEl.style.maxHeight = maxH + 'px';
+        preEl.style.width = '100%';
+        preEl.style.overflow = 'auto';
+
+        // 텍스트 통계
+        const lines = (p.ascii || '').split('');
+        const L = Math.max(1, lines.reduce((m, line)=> Math.max(m, line.length), 0));
+        const N = Math.max(1, lines.length);
+
+        // 측정용 엘리먼트로 문자 폭을 실제로 잰 뒤, 가로/세로 제약에서 가능한 폰트 크기 계산
+        const meas = document.createElement('span');
+        meas.style.position = 'absolute';
+        meas.style.visibility = 'hidden';
+        meas.style.whiteSpace = 'pre';
+        meas.style.fontFamily = cs.fontFamily;
+        meas.style.letterSpacing = cs.letterSpacing; // 실제 렌더와 동일
+        meas.textContent = '0'.repeat(L);
+        document.body.appendChild(meas);
+        meas.style.fontSize = '100px';
+        const W100 = meas.getBoundingClientRect().width || 1; // 100px 폰트에서의 가장 긴 줄 폭
+        document.body.removeChild(meas);
+
+        // 가로로 맞추기 위한 폰트 크기 (선형 스케일)
+        // W(fs) ≈ W100 * (fs / 100)
+        const fsByWidth = Math.floor((contentW - 2) * 100 / W100);
+
+        // 세로로 맞추기 위한 폰트 크기
+        const lineHeightFactor = 1.05; // CSS와 동일
+        const fsByHeight = Math.floor((maxH - padY) / (N * lineHeightFactor));
+
+        // 최종 폰트 크기: 두 제약 중 더 작은 값, 그리고 안전 범위로 클램프
+        let fs = Math.min(fsByWidth, fsByHeight);
+        const MIN_FS = 4, MAX_FS = 26;
+        if(!isFinite(fs) || fs <= 0) fs = 12;
+        fs = Math.max(MIN_FS, Math.min(MAX_FS, fs));
+
+        preEl.style.fontSize = fs + 'px';
+        preEl.style.letterSpacing = cs.letterSpacing; // 유지
+
+        // 남은 오차 보정: 여전히 넘치면 0.5px 단위로 줄이며 적합하게 맞춤
+        let guard = 40;
+        while(guard-- > 0 && (preEl.scrollWidth > preEl.clientWidth || preEl.scrollHeight > preEl.clientHeight)){
+          fs -= 0.5; if(fs <= MIN_FS) break; preEl.style.fontSize = fs + 'px';
+        }
+      }
+      fitAscii();
+      window.addEventListener('resize', fitAscii, { passive:true });
 
       async function drawComments(){
         const wrap = commentsSec.querySelector('#comments'); wrap.innerHTML = '';
