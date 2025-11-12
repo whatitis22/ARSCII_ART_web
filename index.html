@@ -38,12 +38,25 @@
     .empty{text-align:center; color:#94a3b8; padding:28px}
     .divider{height:1px; background:var(--line); margin:12px 0}
     .warn{background:#1d263a; border:1px solid #2b3a63; color:#bcd3ff; padding:8px 12px; border-radius:8px; font-size:13px}
-  </style>
+    /* Title as ASCII */
+  header h1.logo{margin:0}
+  header h1.logo a{color:var(--text); text-decoration:none}
+  .title-ascii{white-space:pre; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono CJK KR", monospace; font-size:12px; line-height:1; letter-spacing:0.2px; margin:0; display:block}
+  @media (max-width: 900px){ .title-ascii{ font-size:10px } }
+  @media (max-width: 520px){ .title-ascii{ font-size:8px } }
+</style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1><a href="#/">🖼️➡️🅰️ ASCII 아트</a></h1>
+      <h1 class="logo"><a href="#/" id="navLogo" aria-label="홈">
+  <pre class="title-ascii"> ___  ___  ___  _  _       ___         _   
+| . |/ __>|  _>| || |     | . | _ _  _| |_ 
+|   |\__ \| <__| || | ___ |   || '_>  | |  
+|_|_|<___/`___/|_||_||___||_|_||_|    |_|  
+                                            
+  </pre>
+</a></h1>
       <nav>
         <button class="btn ghost" id="navHome">생성기</button>
         <button class="btn ghost" id="navList">게시글</button>
