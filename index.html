@@ -61,44 +61,36 @@
 
   <script>
   (function(){
-    /***********************
-     * ① 환경변수 설정
-     * 아래 두 값을 본인 프로젝트로 교체하세요
-     ***********************/
-    const SUPABASE_URL = 'https://fsqzjyyqewhqorgabodu.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzcXpqeXlxZXdocW9yZ2Fib2R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMzM0OTMsImV4cCI6MjA3NzgwOTQ5M30.hRdyF_uySB6ddpWeZ2Jc4kM35ETRxALsEnWDOjDHqPE';
+    // =========================
+    // ① 환경변수 설정
+    // =========================
+    const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co';
+    const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';
 
-    // 연결 객체
-    const sb = (SUPABASE_URL.startsWith('https://') && SUPABASE_ANON_KEY.startsWith(''))
+    const sb = (typeof window.supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY)
       ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       : null;
 
-    const $connState = () => document.getElementById('connState');
-
+    function setConnState(msg){ const el = document.getElementById('connState'); if(el) el.textContent = msg; }
     async function checkConnection(){
-      if(!sb){ $connState().textContent = '연결 미설정'; return; }
+      if(!sb){ setConnState('연결 미설정'); return; }
       try{
-        const { data, error } = await sb.from('posts').select('id').limit(1);
-        if(error) throw error; $connState().textContent = '온라인';
-      }catch(e){ $connState().textContent = '오프라인(읽기 전용)'; console.warn(e); }
+        const { error } = await sb.from('posts').select('id').limit(1);
+        if(error) throw error;
+        setConnState('온라인');
+      }catch(e){ setConnState('오프라인(읽기 전용)'); console.warn(e); }
     }
 
-    /***********************
-     * ② UI 기본값
-     ***********************/
-    const defaultSettings = {
-      width: 120,
-      charset: "@#$Y!=+~- ", // 끝에 공백 권장
-      invert: false,
-      aspect: 0.5,
-      kindOptions: ['기타','인물','풍경','동물','텍스처','문자아트']
-    };
+    // =========================
+    // ② 설정
+    // =========================
+    const defaultSettings = { width:120, charset:"@#$Y!=+~- ", invert:false, aspect:0.5, kindOptions:['기타','인물','풍경','동물','텍스처','문자아트'] };
     let settings = JSON.parse(localStorage.getItem('ascii_settings_v1')||'null') || defaultSettings;
     function saveSettings(){ localStorage.setItem('ascii_settings_v1', JSON.stringify(settings)); }
 
-    /***********************
-     * ③ 라우팅
-     ***********************/
+    // =========================
+    // ③ 라우팅
+    // =========================
     window.addEventListener('hashchange', render);
     document.getElementById('navHome').onclick = () => { location.hash = '#/'; };
     document.getElementById('navList').onclick = () => { location.hash = '#/list'; };
@@ -116,9 +108,9 @@
       }
     }
 
-    /***********************
-     * ④ 유틸
-     ***********************/
+    // =========================
+    // ④ 유틸
+    // =========================
     function el(tag, attrs={}, children=[]) {
       const node = document.createElement(tag);
       for(const [k,v] of Object.entries(attrs)){
@@ -145,10 +137,11 @@
       const url = URL.createObjectURL(blob);
       const a = el('a', {href:url, download:filename}); document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
+    function debounce(fn, ms){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); }; }
 
-    /***********************
-     * ⑤ 이미지 → ASCII
-     ***********************/
+    // =========================
+    // ⑤ 이미지 → ASCII
+    // =========================
     async function fileToImage(file){
       return new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>res(img); img.onerror=rej; img.src=URL.createObjectURL(file); });
     }
@@ -171,9 +164,9 @@
       return out.join('\n');
     }
 
-    /***********************
-     * ⑥ 데이터 액세스 계층 (Supabase)
-     ***********************/
+    // =========================
+    // ⑥ 데이터 액세스 (Supabase)
+    // =========================
     const store = {
       async listPosts({ q='', kind='전체', limit=20 }={}){
         if(!sb) return { data: [], error: new Error('Supabase 미설정') };
@@ -200,9 +193,9 @@
       }
     };
 
-    /***********************
-     * ⑦ 화면: 생성기
-     ***********************/
+    // =========================
+    // ⑦ 화면: 생성기
+    // =========================
     function renderHome(){
       app.className = 'grid cols-2'; app.innerHTML = '';
       const left = el('section', {class:'card'}, [
@@ -224,13 +217,11 @@
           el('div', {class:'row'}, [ el('button', {class:'btn', id:'btnPost', disabled:true}, ['이걸로 게시 하기']) ])
         ]),
         el('pre', {class:'ascii', id:'preview'}, ['(여기에 결과가 표시됩니다)']),
-        el('div', {class:'warn', style:'margin-top:12px'}, [
-          '※ 멀티유저 모드입니다. 게시/댓글은 Supabase에 저장됩니다.'] )
+        el('div', {class:'warn', style:'margin-top:12px'}, [ '※ 멀티유저 모드입니다. 게시/댓글은 Supabase에 저장됩니다.' ])
       ]);
 
       app.append(left, right);
 
-      // 상태 요소
       const $file = left.querySelector('#file');
       const $rangeW = left.querySelector('#rangeW'); const $rangeA = left.querySelector('#rangeA');
       const $wHint = left.querySelector('#wHint'); const $aHint = left.querySelector('#aHint');
@@ -238,7 +229,7 @@
       const $btnGen = left.querySelector('#btnGen'); const $btnCopy = left.querySelector('#btnCopy'); const $btnDownload = left.querySelector('#btnDownload');
       const $btnPost = right.querySelector('#btnPost'); const $preview = right.querySelector('#preview');
 
-      let currentAscii = ''; let lastImg = null;
+      let currentAscii = '';
 
       $rangeW.oninput = (e)=>{ $wHint.textContent = e.target.value + ' chars'; settings.width = +e.target.value; saveSettings(); };
       $rangeA.oninput = (e)=>{ $aHint.textContent = e.target.value; settings.aspect = +e.target.value; saveSettings(); };
@@ -249,8 +240,8 @@
         if(!$file.files[0]){ alert('이미지 파일을 선택하세요.'); return; }
         $btnGen.disabled = true; $btnGen.textContent = '생성 중...';
         try{
-          lastImg = await fileToImage($file.files[0]);
-          currentAscii = imageToAscii(lastImg, +$rangeW.value, $charset.value || settings.charset, $invert.checked, +$rangeA.value);
+          const img = await fileToImage($file.files[0]);
+          currentAscii = imageToAscii(img, +$rangeW.value, $charset.value || settings.charset, $invert.checked, +$rangeA.value);
           $preview.textContent = currentAscii; $btnCopy.disabled = false; $btnDownload.disabled = false; $btnPost.disabled = false;
         }catch(err){ console.error(err); alert('변환 중 오류가 발생했습니다.'); }
         finally{ $btnGen.disabled = false; $btnGen.textContent = 'ASCII 생성'; }
@@ -258,7 +249,6 @@
 
       $btnCopy.onclick = ()=>{ copyText(currentAscii).then(()=>{ $btnCopy.textContent = '복사됨!'; setTimeout(()=> $btnCopy.textContent = '복사', 900); }); };
       $btnDownload.onclick = ()=> downloadText('ascii-art.txt', currentAscii);
-
       $btnPost.onclick = ()=>{ if(!currentAscii) return; openPostDialog(currentAscii); };
     }
 
@@ -291,9 +281,9 @@
       };
     }
 
-    /***********************
-     * ⑧ 화면: 목록
-     ***********************/
+    // =========================
+    // ⑧ 화면: 목록 (미리보기 제거)
+    // =========================
     function renderList(){
       app.className = 'grid cols-1'; app.innerHTML = '';
       const search = el('section', {class:'card'}, [
@@ -319,14 +309,14 @@
         data.forEach(p=>{
           const item = el('div', {class:'post-item'}, [
             el('div', {style:'flex:1'}, [
-              el('div', {class:'row', style:'justify-content:space-between'}, [
+              el('div', {class:'row', style:'justify-content:space-between; align-items:center'}, [
                 el('div', {}, [ el('a', {href:'#/post/'+p.id, class:'post-title'}, [p.title]), ' ', el('span',{class:'badge'},[p.kind]) ]),
                 el('div', {class:'hint'}, [new Date(p.created_at).toLocaleString()])
-              ]),
-              el('pre', {class:'ascii', style:'max-height:220px'}, [p.ascii.slice(0, 4000)])
+              ])
             ]),
             el('div', {class:'row', style:'flex-direction:column; gap:8px'}, [
-              el('button', {class:'btn', onclick:()=>{ copyText(p.ascii); }}, ['복사'])
+              el('a', {class:'btn', href:'#/post/'+p.id}, ['열기']),
+              el('button', {class:'btn secondary', onclick:()=>{ copyText(p.ascii); }}, ['복사'])
             ])
           ]);
           list.appendChild(item);
@@ -336,9 +326,9 @@
       $q.oninput = debounce(draw, 250); $fk.onchange = draw; draw();
     }
 
-    /***********************
-     * ⑨ 화면: 게시글
-     ***********************/
+    // =========================
+    // ⑨ 화면: 게시글
+    // =========================
     async function renderPost(id){
       app.className = 'grid cols-1'; app.innerHTML = '';
       const head = el('section', {class:'card'}, [ el('div', {id:'headWrap'}) ]);
@@ -372,11 +362,9 @@
         const { data: list, error: ce } = await store.listComments(id);
         if(ce){ wrap.appendChild(el('div', {class:'empty'}, ['댓글 불러오기 실패: ', ce.message])); return; }
         if(!list.length){ wrap.appendChild(el('div', {class:'empty'}, ['아직 댓글이 없습니다.'])); return; }
-        // 트리로 그룹
         const byParent = new Map(); list.forEach(c=>{ const k = c.parent_id || 'root'; if(!byParent.has(k)) byParent.set(k, []); byParent.get(k).push(c); });
         function displayName(c){
           if(c.nickname && c.nickname.trim()) return c.nickname.trim();
-          // 익명N: 현재 루트 시퀀스 기준으로 계산
           const roots = byParent.get('root')||[]; let idx = 0;
           for(const r of roots){ if(r === c) break; if(!r.nickname || !r.nickname.trim()) idx++; }
           return '익명' + (idx+1);
@@ -420,12 +408,9 @@
       drawComments();
     }
 
-    /***********************
-     * ⑩ 잡다 유틸
-     ***********************/
-    function debounce(fn, ms){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); }; }
-
-    // 초기화
+    // =========================
+    // ⑩ 시작
+    // =========================
     checkConnection();
     render();
   })();
