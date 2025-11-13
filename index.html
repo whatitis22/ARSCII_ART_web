@@ -21,8 +21,8 @@
     .btn.accent{background:linear-gradient(180deg,#2a68ff,#1b46b3); border-color:#1c3b82}
     .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px}
     .grid{display:grid; gap:16px}
-    .grid.cols-2{grid-template-columns:1fr 1fr}
-    @media (max-width: 900px){.grid.cols-2{grid-template-columns:1fr}}
+    .grid.cols-2{grid-template-columns:1fr 1fr}@media (max-width: 900px){.grid.cols-2{grid-template-columns:1fr}} 
+    .span-2{grid-column:1 / -1} 
     label{font-size:12px; color:var(--muted); display:block; margin-bottom:6px}
     input[type="text"], input[type="search"], select, textarea{ width:100%; background:#0d1018; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:14px }
     input[type="range"]{width:100%}
@@ -79,6 +79,7 @@
     // =========================
     const SUPABASE_URL = 'https://fsqzjyyqewhqorgabodu.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzcXpqeXlxZXdocW9yZ2Fib2R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMzM0OTMsImV4cCI6MjA3NzgwOTQ5M30.hRdyF_uySB6ddpWeZ2Jc4kM35ETRxALsEnWDOjDHqPE';
+
 
     const sb = (typeof window.supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY)
       ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -210,10 +211,13 @@
     // ⑦ 화면: 생성기
     // =========================
     function renderHome(){
-      app.className = 'grid cols-2'; app.innerHTML = '';
+      app.className = 'grid cols-2';
+      app.innerHTML = '';
+
+      // 1) 변환기(왼쪽) — 크기/위치 유지
       const left = el('section', {class:'card'}, [
         el('h2', {style:'margin:0 0 8px 0'}, ['이미지 → ASCII 변환기']),
-        el('p', {class:'hint'}, ['이미지를 올리고, 해상도/문자셋을 조정한 뒤 생성하세요.']),
+        el('p', {class:'hint'}, ['이미지를 올리고, 해상도/문자셋을 조정한 뒤 생성하세요.']) ,
         el('div', {class:'grid'}, [
           el('div', {}, [ el('label', {}, ['이미지 파일']), el('input', {type:'file', accept:'image/*', id:'file'}) ]),
           el('div', {}, [ el('label', {}, ['가로 문자 수 (해상도)']), el('input', {type:'range', min:'40', max:'240', value:settings.width, id:'rangeW'}), el('div', {class:'hint', id:'wHint'}, [`${settings.width} chars`]) ]),
@@ -224,30 +228,73 @@
         ])
       ]);
 
-      const right = el('section', {class:'card'}, [
+      // 2) 미리보기 — 변환기 아래로 내리고, 가로는 상단 메뉴(컨테이너) 폭에 맞춤
+      const previewSection = el('section', {class:'card span-2'}, [
         el('div', {class:'row', style:'justify-content:space-between; align-items:center'}, [
           el('h2', {style:'margin:0'}, ['미리보기']),
           el('div', {class:'row'}, [ el('button', {class:'btn', id:'btnPost', disabled:true}, ['이걸로 게시 하기']) ])
         ]),
-        el('pre', {class:'ascii', id:'preview'}, ['(여기에 결과가 표시됩니다)']),
-        el('div', {class:'warn', style:'margin-top:12px'}, [ '※ 멀티유저 모드입니다. 게시/댓글은 Supabase에 저장됩니다.' ])
+        el('pre', {class:'ascii', id:'preview'}, ['(여기에 결과가 표시됩니다)'])
       ]);
 
-      app.append(left, right);
+      app.append(left, previewSection);
 
+      // 상태 요소
       const $file = left.querySelector('#file');
-      const $rangeW = left.querySelector('#rangeW'); const $rangeA = left.querySelector('#rangeA');
-      const $wHint = left.querySelector('#wHint'); const $aHint = left.querySelector('#aHint');
-      const $charset = left.querySelector('#charset'); const $invert = left.querySelector('#invert');
-      const $btnGen = left.querySelector('#btnGen'); const $btnCopy = left.querySelector('#btnCopy'); const $btnDownload = left.querySelector('#btnDownload');
-      const $btnPost = right.querySelector('#btnPost'); const $preview = right.querySelector('#preview');
+      const $rangeW = left.querySelector('#rangeW');
+      const $rangeA = left.querySelector('#rangeA');
+      const $wHint = left.querySelector('#wHint');
+      const $aHint = left.querySelector('#aHint');
+      const $charset = left.querySelector('#charset');
+      const $invert = left.querySelector('#invert');
+      const $btnGen = left.querySelector('#btnGen');
+      const $btnCopy = left.querySelector('#btnCopy');
+      const $btnDownload = left.querySelector('#btnDownload');
+      const $btnPost = previewSection.querySelector('#btnPost');
+      const $preview = previewSection.querySelector('#preview');
 
       let currentAscii = '';
 
-      $rangeW.oninput = (e)=>{ $wHint.textContent = e.target.value + ' chars'; settings.width = +e.target.value; saveSettings(); };
-      $rangeA.oninput = (e)=>{ $aHint.textContent = e.target.value; settings.aspect = +e.target.value; saveSettings(); };
-      $charset.onchange = ()=>{ settings.charset = $charset.value; saveSettings(); };
-      $invert.onchange = ()=>{ settings.invert = $invert.checked; saveSettings(); };
+      $rangeW.oninput = (e)=>{ $wHint.textContent = e.target.value + ' chars'; settings.width = +e.target.value; saveSettings(); fitAsciiPreview(); };
+      $rangeA.oninput = (e)=>{ $aHint.textContent = e.target.value; settings.aspect = +e.target.value; saveSettings(); fitAsciiPreview(); };
+      $charset.onchange = ()=>{ settings.charset = $charset.value; saveSettings(); fitAsciiPreview(); };
+      $invert.onchange = ()=>{ settings.invert = $invert.checked; saveSettings(); fitAsciiPreview(); };
+
+      // 게시글 가로 유지 로직을 응용한 미리보기 폰트자동맞춤
+      function fitAsciiPreview(){
+        const cs = getComputedStyle($preview);
+        const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+        const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+        const contentW = Math.max(50, $preview.clientWidth - padX);
+        const lines = ($preview.textContent||'').split('\\n');
+        const L = Math.max(1, lines.reduce((m, line)=> Math.max(m, line.length), 0));
+        const N = Math.max(1, lines.length);
+
+        // 측정 기반 선형 스케일
+        const meas = document.createElement('span');
+        meas.style.position = 'absolute'; meas.style.visibility = 'hidden'; meas.style.whiteSpace = 'pre';
+        meas.style.fontFamily = cs.fontFamily; meas.style.letterSpacing = cs.letterSpacing; meas.textContent = '0'.repeat(L);
+        document.body.appendChild(meas); meas.style.fontSize = '100px';
+        const W100 = meas.getBoundingClientRect().width || 1; document.body.removeChild(meas);
+        const fsByWidth = Math.floor((contentW - 2) * 100 / W100);
+
+        // 높이는 미리보기에서 과도하게 늘어나지 않도록 60vh 근사치로 제한
+        const maxH = Math.max(200, Math.floor(window.innerHeight * 0.60));
+        $preview.style.maxHeight = maxH + 'px';
+        const lineHeightFactor = 1.05; // .ascii 스타일과 일치
+        const fsByHeight = Math.floor((maxH - padY) / (N * lineHeightFactor));
+
+        let fs = Math.min(fsByWidth, fsByHeight);
+        const MIN_FS = 4, MAX_FS = 26;
+        if(!isFinite(fs) || fs <= 0) fs = 12; fs = Math.max(MIN_FS, Math.min(MAX_FS, fs));
+        $preview.style.fontSize = fs + 'px';
+
+        // 미세 조정
+        let guard = 40;
+        while(guard-- > 0 && ($preview.scrollWidth > $preview.clientWidth || $preview.scrollHeight > $preview.clientHeight)){
+          fs -= 0.5; if(fs <= MIN_FS) break; $preview.style.fontSize = fs + 'px';
+        }
+      }
 
       $btnGen.onclick = async () => {
         if(!$file.files[0]){ alert('이미지 파일을 선택하세요.'); return; }
@@ -255,19 +302,26 @@
         try{
           const img = await fileToImage($file.files[0]);
           currentAscii = imageToAscii(img, +$rangeW.value, $charset.value || settings.charset, $invert.checked, +$rangeA.value);
-          $preview.textContent = currentAscii; $btnCopy.disabled = false; $btnDownload.disabled = false; $btnPost.disabled = false;
+          $preview.textContent = currentAscii;
+          $btnCopy.disabled = false; $btnDownload.disabled = false; $btnPost.disabled = false;
+          fitAsciiPreview();
         }catch(err){ console.error(err); alert('변환 중 오류가 발생했습니다.'); }
         finally{ $btnGen.disabled = false; $btnGen.textContent = 'ASCII 생성'; }
       };
 
       $btnCopy.onclick = ()=>{ copyText(currentAscii).then(()=>{ $btnCopy.textContent = '복사됨!'; setTimeout(()=> $btnCopy.textContent = '복사', 900); }); };
       $btnDownload.onclick = ()=> downloadText('ascii-art.txt', currentAscii);
-      $btnPost.onclick = ()=>{ if(!currentAscii) return; openPostDialog(currentAscii); };
-    }
+      $btnPost.onclick = ()=>{ if(!currentAscii) { alert('먼저 ASCII를 생성하세요.'); return; } openPostDialog(currentAscii); };
 
+      // 초기 1회 맞춤 + 리사이즈 반응
+      fitAsciiPreview();
+      window.addEventListener('resize', fitAsciiPreview, { passive:true });
+    };
+
+    // === 게시 모달 (누락 복구) ===
     function openPostDialog(ascii){
       const modal = el('div', {style:'position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.45);z-index:50'});
-      const kinds = settings.kindOptions;
+      const kinds = settings.kindOptions || ['기타'];
       const card = el('div', {class:'card', style:'max-width:640px; width:92vw'}, [
         el('h3', {style:'margin-top:0'}, ['게시글 만들기']),
         el('div', {class:'grid'}, [
@@ -290,7 +344,9 @@
         if(!sb){ alert('Supabase 미설정. 설정 후 다시 시도하세요.'); return; }
         const { data, error } = await store.createPost(post);
         if(error){ alert('게시 실패: '+ error.message); return; }
-        modal.remove(); location.hash = '#/post/' + data.id;
+        const row = Array.isArray(data) ? data[0] : data; // 객체/배열 모두 대응
+        if(!row || !row.id){ alert('게시 실패: 응답에 ID가 없습니다.'); return; }
+        modal.remove(); location.hash = '#/post/' + row.id;
       };
     }
 
@@ -390,7 +446,7 @@
         preEl.style.overflow = 'auto';
 
         // 텍스트 통계
-        const lines = (p.ascii || '').split('');
+        const lines = (p.ascii || '').split('\\n');
         const L = Math.max(1, lines.reduce((m, line)=> Math.max(m, line.length), 0));
         const N = Math.max(1, lines.length);
 
