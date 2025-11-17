@@ -106,8 +106,10 @@
     if (navLogo)
       navLogo.addEventListener('click', (e) => {
         e.preventDefault();
+        playClick();            // 🔊 로고(홈) 클릭 시 소리
         location.hash = '#/';
       });
+
 
     window.addEventListener('hashchange', render);
     render();
