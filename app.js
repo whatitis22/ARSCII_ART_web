@@ -35,6 +35,33 @@
   }
 
   // =========================
+  // 클릭 사운드 (모든 버튼 공용)
+  // =========================
+  const clickSound = new Audio('click.mp3'); // 같은 폴더에 있는 mp3
+  clickSound.preload = 'auto';
+
+  function playClick() {
+    try {
+      // 같은 소리를 연속으로 낼 수 있도록 항상 처음부터 재생
+      clickSound.currentTime = 0;
+      clickSound.play();
+    } catch (e) {
+      // 일부 브라우저 정책이나 에러는 무시
+      console.warn('click sound error', e);
+    }
+  }
+
+  // 모든 버튼 클릭에 대해 전역으로 소리 재생
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;            // 버튼이 아니면 무시
+    if (btn.disabled) return;    // 비활성화 버튼은 소리 X
+    playClick();
+  });
+
+
+
+  // =========================
   // ② 설정 저장
   // =========================
   const defaultSettings = {
@@ -238,22 +265,31 @@
   };
 
   // =========================
-  // ⑦ ASCII 폭에 맞춰 폰트 자동 조정
+  // ⑦ ASCII 자동 폰트 조정 (폭 + 높이 둘 다)
   // =========================
-  function fitAsciiToWidth(preEl, text) {
-    preEl.textContent = text || '';
+  function fitAsciiToWidth(preEl, text, options = {}) {
+    if (!preEl) return;
 
+    const ascii = text || '';
+    preEl.textContent = ascii;
+
+    // 컨테이너 폭/패딩 계산
     const cs = getComputedStyle(preEl);
-    const padX =
-      parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-    const contentW = Math.max(50, preEl.clientWidth - padX);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
 
-    const lines = (text || '').split('\n');
+    const rawW = preEl.clientWidth - padX;
+    const contentW = Math.max(40, rawW);
+
+    // 줄 정보
+    const lines = ascii.split('\n');
     const L = Math.max(
       1,
       lines.reduce((m, line) => Math.max(m, line.length), 0),
     );
+    const N = Math.max(1, lines.length);
 
+    // 문자 폭 측정 (100px 기준)
     const meas = document.createElement('span');
     meas.style.position = 'absolute';
     meas.style.visibility = 'hidden';
@@ -261,30 +297,81 @@
     meas.style.fontFamily = cs.fontFamily;
     meas.style.letterSpacing = cs.letterSpacing;
     meas.textContent = '0'.repeat(L || 1);
-
     document.body.appendChild(meas);
     meas.style.fontSize = '100px';
     const W100 = meas.getBoundingClientRect().width || 1;
     document.body.removeChild(meas);
 
-    let fs = Math.floor((contentW * 100) / W100);
+    // 가로 기준 폰트 크기
+    const fsByWidth = Math.floor(((contentW - 2) * 100) / W100);
+
+    // 사용할 최대 높이 계산
+    let maxH = options.maxHeight || 0;
+
+    if (!maxH) {
+      if (options.context === 'post') {
+        // 게시글 상세: 헤더 + 타이틀 카드 높이를 제외한 나머지
+        const header = document.querySelector('header');
+        const headCard = document
+          .getElementById('headWrap')
+          ?.closest('.card');
+        const topHeights =
+          (header ? header.offsetHeight : 0) +
+          (headCard ? headCard.offsetHeight : 0) +
+          48; // 여유
+        maxH = Math.max(200, window.innerHeight - topHeights);
+      } else {
+        // 기본: 화면 60% 정도만 사용 (생성기 미리보기 등)
+        maxH = Math.max(200, Math.floor(window.innerHeight * 0.6));
+      }
+    }
+
+    preEl.style.maxHeight = maxH + 'px';
+    preEl.style.overflow = 'auto';
+    preEl.style.width = '100%';
+
+    const lineHeightFactor = 1.05; // .ascii line-height와 맞춤
+    const fsByHeight = Math.floor(
+      (maxH - padY) / (N * lineHeightFactor),
+    );
+
+    let fs = Math.min(fsByWidth, fsByHeight);
     const MIN_FS = 4;
     const MAX_FS = 26;
 
     if (!isFinite(fs) || fs <= 0) fs = 12;
     fs = Math.max(MIN_FS, Math.min(MAX_FS, fs));
     preEl.style.fontSize = fs + 'px';
+    preEl.style.letterSpacing = cs.letterSpacing; // 기본 유지
 
-    let guard = 40;
-    while (guard-- > 0 && preEl.scrollWidth > preEl.clientWidth) {
+    // 1차 미세 조정 (폭/높이 모두 만족할 때까지 줄이기)
+    let guard = 60;
+    while (
+      guard-- > 0 &&
+      (preEl.scrollWidth > preEl.clientWidth ||
+        preEl.scrollHeight > preEl.clientHeight)
+    ) {
       fs -= 0.5;
       if (fs <= MIN_FS) break;
       preEl.style.fontSize = fs + 'px';
     }
+
+    // 여전히 가로가 넘치면 letter-spacing을 줄여서 한 번 더 맞춰보기
+    if (preEl.scrollWidth > preEl.clientWidth) {
+      preEl.style.letterSpacing = '0px';
+      guard = 40;
+      while (
+        guard-- > 0 &&
+        (preEl.scrollWidth > preEl.clientWidth ||
+          preEl.scrollHeight > preEl.clientHeight)
+      ) {
+        fs -= 0.5;
+        if (fs <= MIN_FS) break;
+        preEl.style.fontSize = fs + 'px';
+      }
+    }
   }
 
-  let previewResizeHandler = null;
-  let postResizeHandler = null;
 
   // =========================
   // ⑧ 화면: 생성기
@@ -410,8 +497,9 @@
     let currentAscii = '';
 
     function refitPreview() {
-      fitAsciiToWidth($preview, currentAscii);
+      fitAsciiToWidth($preview, currentAscii, { context: 'preview' });
     }
+
 
     if (previewResizeHandler) {
       window.removeEventListener('resize', previewResizeHandler);
@@ -662,50 +750,69 @@
         return;
       }
 
-      data.forEach((p) => {
-        const item = el('div', { class: 'post-item' }, [
+          data.forEach((p) => {
+      const item = el(
+        'div',
+        {
+          class: 'post-item',
+          onclick: () => {
+            // 박스를 클릭하면 소리 + 해당 게시글로 이동
+            playClick();
+            location.hash = '#/post/' + p.id;
+          },
+        },
+        [
+          // 좌측: 제목/메타
           el('div', { style: 'flex:1' }, [
-            el('div', {
-              class: 'row',
-              style:
-                'justify-content:space-between; align-items:center',
-            }, [
-              el('div', {}, [
-                el(
-                  'a',
-                  {
-                    href: '#/post/' + p.id,
-                    class: 'post-title',
-                  },
-                  [p.title],
-                ),
-                ' ',
-                el('span', { class: 'badge' }, [p.kind]),
-              ]),
-              el('div', { class: 'hint' }, [
-                new Date(p.created_at).toLocaleString(),
-              ]),
-            ]),
-          ]),
-          el('div', {
-            class: 'row',
-            style: 'flex-direction:column; gap:8px',
-          }, [
             el(
-              'a',
-              { class: 'btn', href: '#/post/' + p.id },
-              ['열기'],
-            ),
-            el('button', {
-              class: 'btn secondary',
-              onclick: () => {
-                copyText(p.ascii);
+              'div',
+              {
+                class: 'row',
+                style:
+                  'justify-content:space-between; align-items:center',
               },
-            }, ['복사']),
+              [
+                el('div', {}, [
+                  // 🔹 a 태그 대신 span 사용 (더 이상 개별 링크 아님)
+                  el('span', { class: 'post-title' }, [p.title]),
+                  ' ',
+                  el('span', { class: 'badge' }, [p.kind]),
+                ]),
+                el('div', { class: 'hint' }, [
+                  new Date(p.created_at).toLocaleString(),
+                ]),
+              ],
+            ),
           ]),
-        ]);
-        list.appendChild(item);
-      });
+
+          // 우측: 복사 버튼만 남김 (열기 버튼 삭제)
+          el(
+            'div',
+            {
+              class: 'row',
+              style: 'flex-direction:column; gap:8px',
+            },
+            [
+              el(
+                'button',
+                {
+                  class: 'btn secondary',
+                  onclick: (ev) => {
+                    // 복사 눌렀을 때 박스 클릭 이벤트(이동) 막기
+                    ev.stopPropagation();
+                    copyText(p.ascii);
+                  },
+                },
+                ['복사'],
+              ),
+            ],
+          ),
+        ],
+      );
+
+      list.appendChild(item);
+    });
+
     }
 
     $q.oninput = debounce(draw, 250);
@@ -811,12 +918,14 @@
     );
 
     // ASCII 폭에 맞게 폰트 조정
+        // ASCII 폭/높이에 맞게 폰트 조정
     function refitPost() {
-      fitAsciiToWidth(preEl, p.ascii || '');
+      fitAsciiToWidth(preEl, p.ascii || '', { context: 'post' });
     }
 
     preEl.textContent = p.ascii || '';
     refitPost();
+
 
     if (postResizeHandler) {
       window.removeEventListener('resize', postResizeHandler);

@@ -22,7 +22,45 @@
     .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
     .hint{color:var(--muted); font-size:12px}
     pre.ascii{white-space:pre; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono CJK KR", monospace; line-height:1.05; letter-spacing:0.4px; overflow:auto; padding:12px; background:#0b0e15; border:1px dashed #2a3147; border-radius:12px; max-height:60vh}
-    .post-item{display:flex; align-items:flex-start; gap:12px; padding:12px; border:1px solid var(--line); border-radius:12px; background:#121726}
+    
+.post-item{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#121726;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
+  cursor:pointer;
+}
+
+/* 하이라이트(마우스 올렸을 때) */
+.post-item:hover{
+  background:#ffffff;        /* 카드 배경을 하얀색으로 */
+  color:#020617;             /* 전체 텍스트 색은 진한 남색/검정 계열 */
+  border-color:#e5e7eb;
+  transform:translateY(-1px); /* 살짝 떠오르는 느낌 (옵션) */
+}
+
+/* 안쪽 텍스트/뱃지도 어두운 색으로 맞추기 */
+.post-item:hover .post-title{
+  color:#020617;
+}
+.post-item:hover .hint{
+  color:#4b5563;
+}
+.post-item:hover .badge{
+  background:#e5e7eb;
+  border-color:#cbd5e1;
+  color:#020617;
+}
+
+
     .post-title{font-weight:700}
     .badge{display:inline-block; padding:2px 8px; border:1px solid var(--line); border-radius:999px; font-size:12px; color:#cbd5e1; background:#0e1220}
     .comment{border-top:1px solid var(--line); padding-top:12px; margin-top:12px}
