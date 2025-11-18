@@ -374,6 +374,8 @@
     }
   }
 
+  let previewResizeHandler = null;
+  let postResizeHandler = null;
 
   // =========================
   // ⑧ 화면: 생성기
